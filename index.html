@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Real-Time Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --temp-color: #f97316;
+      --humi-color: #06b6d4;
+      --light-color: #eab308;
+      --accent: #10b981;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--accent);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .card-icon {
+      font-size: 20px;
+    }
+
+    .card-value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+
+    .card-footer {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .temp-card .card-value { color: var(--temp-color); }
+    .humi-card .card-value { color: var(--humi-color); }
+    .light-card .card-value { color: var(--light-color); }
+
+    /* Chart Section */
+    .chart-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .chart-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 320px;
+      display: block;
+    }
+
+    /* Logs Table */
+    .table-container {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      color: var(--text-muted);
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 500;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div>
+        <h1>IoT Sensor Real-Time Dashboard</h1>
+        <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">ติดตามและแสดงผลข้อมูลเซนเซอร์แบบเรียลไทม์</p>
+      </div>
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>เชื่อมต่อแล้ว (Live)</span>
+      </div>
+    </header>
+
+    <!-- Cards Numerical Summary -->
+    <section class="cards-grid">
+      <!-- Temperature Card -->
+      <div class="card temp-card">
+        <div class="card-header">
+          <span>อุณหภูมิ (Temperature)</span>
+          <span class="card-icon">🌡️</span>
+        </div>
+        <div class="card-value" id="val-temp">-- °C</div>
+        <div class="card-footer">
+          <span>ค่าปกติ: 20 - 35 °C</span>
+          <span id="time-temp">--:--:--</span>
+        </div>
+      </div>
+
+      <!-- Humidity Card -->
+      <div class="card humi-card">
+        <div class="card-header">
+          <span>ความชื้น (Humidity)</span>
+          <span class="card-icon">💧</span>
+        </div>
+        <div class="card-value" id="val-humi">-- %</div>
+        <div class="card-footer">
+          <span>ค่าปกติ: 40 - 70 %</span>
+          <span id="time-humi">--:--:--</span>
+        </div>
+      </div>
+
+      <!-- Light Card -->
+      <div class="card light-card">
+        <div class="card-header">
+          <span>ความสว่าง (Light Level)</span>
+          <span class="card-icon">☀️</span>
+        </div>
+        <div class="card-value" id="val-light">-- Lux</div>
+        <div class="card-footer">
+          <span>ค่าปกติ: 200 - 800 Lux</span>
+          <span id="time-light">--:--:--</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real-Time Chart -->
+    <section class="chart-container">
+      <div class="chart-header">
+        <div class="chart-title">แนวโน้มข้อมูล (Real-Time Trend)</div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--temp-color);"></div>
+            <span>อุณหภูมิ (°C)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--humi-color);"></div>
+            <span>ความชื้น (%)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-color" style="background-color: var(--light-color);"></div>
+            <span>แสง (Lux/10)</span>
+          </div>
+        </div>
+      </div>
+      <canvas id="realtimeChart"></canvas>
+    </section>
+
+    <!-- Recent Logs Table -->
+    <section class="table-container">
+      <div class="chart-title" style="margin-bottom: 12px;">ประวัติการรับข้อมูลล่าสุด (Recent Logs)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>เวลา</th>
+            <th>อุณหภูมิ (°C)</th>
+            <th>ความชื้น (%)</th>
+            <th>แสง (Lux)</th>
+            <th>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody id="logTableBody">
+          <!-- Rows will be injected by JavaScript -->
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    // Config & States
+    const MAX_DATA_POINTS = 20;
+    const historyData = [];
+
+    // Colors
+    const COLOR_TEMP = '#f97316';
+    const COLOR_HUMI = '#06b6d4';
+    const COLOR_LIGHT = '#eab308';
+    const COLOR_GRID = '#334155';
+
+    // DOM Elements
+    const elTemp = document.getElementById('val-temp');
+    const elHumi = document.getElementById('val-humi');
+    const elLight = document.getElementById('val-light');
+    const elTimeTemp = document.getElementById('time-temp');
+    const elTimeHumi = document.getElementById('time-humi');
+    const elTimeLight = document.getElementById('time-light');
+    const logTableBody = document.getElementById('logTableBody');
+    const canvas = document.getElementById('realtimeChart');
+    const ctx = canvas.getContext('2d');
+
+    // Generate Mock Data (หรือเปลี่ยนเป็นดึงข้อมูลจริงจาก API/WebSocket)
+    function generateNewDataPoint() {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      
+      const lastPoint = historyData[historyData.length - 1] || { temp: 28, humi: 55, light: 450 };
+      
+      // Random walk for smooth movement
+      const temp = Math.min(Math.max(lastPoint.temp + (Math.random() * 2 - 1), 20), 40);
+      const humi = Math.min(Math.max(lastPoint.humi + (Math.random() * 4 - 2), 30), 80);
+      const light = Math.min(Math.max(lastPoint.light + (Math.random() * 20 - 10), 100), 900);
+
+      return {
+        time: timeStr,
+        temp: parseFloat(temp.toFixed(1)),
+        humi: parseFloat(humi.toFixed(1)),
+        light: Math.round(light)
+      };
+    }
+
+    // Update Dashboard UI
+    function updateDashboard() {
+      const newPoint = generateNewDataPoint();
+      
+      // Update State Data
+      historyData.push(newPoint);
+      if (historyData.length > MAX_DATA_POINTS) {
+        historyData.shift();
+      }
+
+      // 1. Update Numeric Cards
+      elTemp.innerText = `${newPoint.temp} °C`;
+      elHumi.innerText = `${newPoint.humi} %`;
+      elLight.innerText = `${newPoint.light} Lux`;
+      
+      elTimeTemp.innerText = newPoint.time;
+      elTimeHumi.innerText = newPoint.time;
+      elTimeLight.innerText = newPoint.time;
+
+      // 2. Update Table Logs
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${newPoint.time}</td>
+        <td style="color: ${COLOR_TEMP}; font-weight: 600;">${newPoint.temp} °C</td>
+        <td style="color: ${COLOR_HUMI}; font-weight: 600;">${newPoint.humi} %</td>
+        <td style="color: ${COLOR_LIGHT}; font-weight: 600;">${newPoint.light} Lux</td>
+        <td><span style="color: var(--accent);">● ปกติ</span></td>
+      `;
+      logTableBody.insertBefore(tr, logTableBody.firstChild);
+      if (logTableBody.children.length > 5) {
+        logTableBody.removeChild(logTableBody.lastChild);
+      }
+
+      // 3. Redraw Real-Time Chart
+      drawChart();
+    }
+
+    // Canvas Chart Rendering Logic
+    function drawChart() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      const padding = 40;
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (historyData.length < 2) return;
+
+      // Draw Grid & Y-Axis Labels
+      ctx.strokeStyle = COLOR_GRID;
+      ctx.lineWidth = 0.5;
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '11px sans-serif';
+
+      const steps = 4;
+      for (let i = 0; i <= steps; i++) {
+        const y = padding + ((height - padding * 2) / steps) * i;
+        const val = 100 - (100 / steps) * i;
+        
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(width - padding, y);
+        ctx.stroke();
+
+        ctx.fillText(val.toString(), 10, y + 4);
+      }
+
+      // Helper function to plot lines
+      function plotSeries(keySelector, color, scaleFactor = 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5;
+
+        const xStep = (width - padding * 2) / (MAX_DATA_POINTS - 1);
+
+        historyData.forEach((pt, idx) => {
+          const val = keySelector(pt) * scaleFactor;
+          // Scale 0-100 to chart height
+          const y = (height - padding) - (val / 100) * (height - padding * 2);
+          const x = padding + idx * xStep;
+
+          if (idx === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+
+        ctx.stroke();
+
+        // Draw points
+        historyData.forEach((pt, idx) => {
+          const val = keySelector(pt) * scaleFactor;
+          const y = (height - padding) - (val / 100) * (height - padding * 2);
+          const x = padding + idx * xStep;
+
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        });
+      }
+
+      // Plot data series
+      plotSeries(d => d.temp, COLOR_TEMP, 1);       // Temp (0-100)
+      plotSeries(d => d.humi, COLOR_HUMI, 1);       // Humi (0-100)
+      plotSeries(d => d.light, COLOR_LIGHT, 0.1);   // Light scaled down (/10) to fit 0-100 axis
+
+      // Draw X-Axis Time Labels
+      const xStep = (width - padding * 2) / (MAX_DATA_POINTS - 1);
+      ctx.fillStyle = '#94a3b8';
+      historyData.forEach((pt, idx) => {
+        if (idx % 3 === 0 || idx === historyData.length - 1) {
+          const x = padding + idx * xStep;
+          ctx.fillText(pt.time, x - 20, height - 12);
+        }
+      });
+    }
+
+    // Initialize Chart & Loop Update every 2 Seconds
+    for(let i = 0; i < 10; i++) updateDashboard(); // Initial fill
+    setInterval(updateDashboard, 2000);
+
+    // Responsive Canvas Resize Listener
+    window.addEventListener('resize', drawChart);
+  </script>
+</body>
+</html>
